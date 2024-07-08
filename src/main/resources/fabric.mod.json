@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "realistic_armor_weight",
+  "version": "${version}",
+
+  "name": "Realistic Armor Weight",
+  "description": "This mod reduces player movement speed and jump based on the armor type, stronger armors are considered heavier, whereas light armor doesn't significantly impact movement at all. If enabled, player can counter this by increasing his speed and strength. There is also an option to increase jump height according to the player's speed, strength and fall damage resistance",
+  "authors": [
+    "pbldmngz"
+  ],
+  "contact": {
+    "homepage": "https://fabricmc.net/",
+    "sources": "https://github.com/pbldmngz/realistic-armor-weight-minecraft-mod"
+  },
+
+  "license": "MIT License",
+  "icon": "assets/modid/icon.png",
+
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.pbldmngz.realistic_armor_weight.RealisticArmorWeight"
+    ],
+    "client": [
+      "net.pbldmngz.realistic_armor_weight.RealisticArmorWeightClient"
+    ],
+    "fabric-datagen": [
+      "net.pbldmngz.realistic_armor_weight.datagen.ModDataGeneration"
+    ]
+  },
+  "mixins": [
+    "realistic_armor_weight.mixins.json"
+  ],
+
+  "depends": {
+    "fabricloader": ">=0.14.6",
+    "fabric": "*",
+    "minecraft": "~1.19",
+    "java": ">=17"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}
