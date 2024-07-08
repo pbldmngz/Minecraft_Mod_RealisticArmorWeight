@@ -1,44 +1,25 @@
 {
   "schemaVersion": 1,
-  "id": "realistic_armor_weight",
+  "id": "armorweight",
   "version": "${version}",
-
-  "name": "Realistic Armor Weight",
-  "description": "This mod reduces player movement speed and jump based on the armor type, stronger armors are considered heavier, whereas light armor doesn't significantly impact movement at all. If enabled, player can counter this by increasing his speed and strength. There is also an option to increase jump height according to the player's speed, strength and fall damage resistance. If the player has Elytra on, his speed will increase too. The faster you go when attacking, the higher the damage dealt.",
-  "authors": [
-    "pbldmngz"
-  ],
+  "name": "Realistic Armor Weight Mod",
+  "description": "Modifies player movement based on armor weight. Boost other stats depending on speed.",
+  "authors": ["pbldmngz"],
   "contact": {
     "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/pbldmngz/realistic-armor-weight-minecraft-mod"
+    "sources": "https://github.com/pbldmngz/MinecraftMod_RealisticArmorWeight"
   },
-
-  "license": "MIT License",
-  "icon": "assets/modid/icon.png",
-
+  "license": "MIT",
+  "icon": "assets/armorweight/icon.png",
   "environment": "*",
   "entrypoints": {
-    "main": [
-      "net.pbldmngz.realistic_armor_weight.RealisticArmorWeight"
-    ],
-    "client": [
-      "net.pbldmngz.realistic_armor_weight.RealisticArmorWeightClient"
-    ],
-    "fabric-datagen": [
-      "net.pbldmngz.realistic_armor_weight.datagen.ModDataGeneration"
-    ]
+    "main": ["net.pbldmngz.realistic_armor_weight.ArmorWeightMod"]
   },
-  "mixins": [
-    "realistic_armor_weight.mixins.json"
-  ],
-
+  "mixins": ["armorweight.mixins.json"],
   "depends": {
-    "fabricloader": ">=0.14.6",
-    "fabric": "*",
-    "minecraft": "~1.19",
+    "fabricloader": ">=0.14.9",
+    "fabric-api": "*",
+    "minecraft": "~1.19.2",
     "java": ">=17"
-  },
-  "suggests": {
-    "another-mod": "*"
   }
 }

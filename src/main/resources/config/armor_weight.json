@@ -1,0 +1,15 @@
+{
+  "armorWeights": {
+    "leather": 0.015,
+    "chainmail": 0.025,
+    "iron": 0.06,
+    "gold": 0.035,
+    "diamond": 0.075,
+    "netherite": 0.09
+  },
+  "enableCounterAttributes": true,
+  "enableSpeedJump": true,
+  "elytraSpeedBonus": 0.3,
+  "elytraFallResistanceBonus": 2.5,
+  "speedAttackMultiplier": 0.2
+}
