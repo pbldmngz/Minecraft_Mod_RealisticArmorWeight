@@ -4,7 +4,7 @@
   "version": "${version}",
 
   "name": "Realistic Armor Weight",
-  "description": "This mod reduces player movement speed and jump based on the armor type, stronger armors are considered heavier, whereas light armor doesn't significantly impact movement at all. If enabled, player can counter this by increasing his speed and strength. There is also an option to increase jump height according to the player's speed, strength and fall damage resistance",
+  "description": "This mod reduces player movement speed and jump based on the armor type, stronger armors are considered heavier, whereas light armor doesn't significantly impact movement at all. If enabled, player can counter this by increasing his speed and strength. There is also an option to increase jump height according to the player's speed, strength and fall damage resistance. If the player has Elytra on, his speed will increase too. The faster you go when attacking, the higher the damage dealt.",
   "authors": [
     "pbldmngz"
   ],

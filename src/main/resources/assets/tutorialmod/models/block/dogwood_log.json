@@ -1,7 +1,0 @@
-{
-  "parent": "minecraft:block/cube_column",
-  "textures": {
-    "end": "tutorialmod:block/dogwood_log_top",
-    "side": "tutorialmod:block/dogwood_log"
-  }
-}
