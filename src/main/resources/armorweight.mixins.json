@@ -4,11 +4,10 @@
   "package": "net.pbldmngz.realistic_armor_weight.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "PlayerEntityMixin"
+    "PlayerEntityMixin",
+    "PlayerEntityDataMixin"
   ],
-  "client": [
-    "PlayerEntityMixin"
-  ],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   }
