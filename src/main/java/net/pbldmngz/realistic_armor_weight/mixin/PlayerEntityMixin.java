@@ -1,5 +1,7 @@
 package net.pbldmngz.realistic_armor_weight.mixin;
 
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -8,10 +10,8 @@ import net.minecraft.entity.data.TrackedData;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.MathHelper;
-import net.pbldmngz.realistic_armor_weight.ArmorWeightMod;
-import net.pbldmngz.realistic_armor_weight.CustomSpeedAccessor;
+import net.pbldmngz.realistic_armor_weight.*;
 import net.pbldmngz.realistic_armor_weight.network.ArmorWeightPackets;
-import net.pbldmngz.realistic_armor_weight.JumpHandler;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -41,9 +41,15 @@ import java.util.UUID;
 import java.util.Queue;
 import java.util.LinkedList;
 
+import net.minecraft.entity.player.PlayerEntity;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+
 
 @Mixin(PlayerEntity.class)
-public abstract class PlayerEntityMixin extends LivingEntity implements JumpHandler {
+public abstract class PlayerEntityMixin extends LivingEntity implements ArmorWeightHandler {
 
     private static final UUID ARMOR_WEIGHT_SPEED_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ELYTRA_SPEED_UUID = UUID.fromString("00000000-0000-0000-0000-000000000003");
@@ -74,19 +80,34 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
 
     @Inject(method = "jump", at = @At("HEAD"), cancellable = true)
     private void onJump(CallbackInfo ci) {
-        if (this.world.isClient) {
-            long currentTime = System.currentTimeMillis();
-            if (currentTime - lastJumpTime < JUMP_COOLDOWN) {
-                ci.cancel();
-                return;
-            }
-            lastJumpTime = currentTime;
+        PlayerEntity player = (PlayerEntity)(Object)this;
+        long currentTime = System.currentTimeMillis();
 
-            PacketByteBuf buf = PacketByteBufs.create();
-            ClientPlayNetworking.send(ArmorWeightPackets.JUMP_REQUEST, buf);
-
+        if (currentTime - lastJumpTime < JUMP_COOLDOWN) {
             ci.cancel();
+            return;
         }
+
+        lastJumpTime = currentTime;
+
+        float weightFactor = calculateArmorWeightFactor(player);
+        float jumpBoost = calculateJumpBoost(player, weightFactor);
+
+        // Apply jump boost
+        Vec3d velocity = player.getVelocity();
+        player.setVelocity(velocity.x, jumpBoost, velocity.z);
+
+        // Cancel vanilla jump
+        ci.cancel();
+
+        if (player.world.isClient) {
+            sendJumpRequestToServer();
+        }
+    }
+
+    @Environment(EnvType.CLIENT)
+    private void sendJumpRequestToServer() {
+        ClientPlayNetworking.send(ArmorWeightPackets.JUMP_REQUEST, PacketByteBufs.create());
     }
 
     @Override
@@ -101,11 +122,15 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
             float weightFactor = calculateArmorWeightFactor(player);
             float jumpBoost = calculateJumpBoost(player, weightFactor);
             Vec3d newVelocity = player.getVelocity().add(0, jumpBoost, 0);
-            player.setVelocity(newVelocity);
 
-            PacketByteBuf buf = PacketByteBufs.create();
-            buf.writeDouble(newVelocity.y);
-            ServerPlayNetworking.send((ServerPlayerEntity) player, ArmorWeightPackets.JUMP_SYNC, buf);
+            // Only send correction if there's a significant difference
+            if (Math.abs(newVelocity.y - player.getVelocity().y) > 0.01) {
+                player.setVelocity(newVelocity);
+
+                PacketByteBuf buf = PacketByteBufs.create();
+                buf.writeDouble(newVelocity.y);
+                ServerPlayNetworking.send((ServerPlayerEntity) player, ArmorWeightPackets.JUMP_SYNC, buf);
+            }
         }
     }
 
@@ -167,7 +192,8 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
         }
     }
 
-    private float calculateArmorWeightFactor(PlayerEntity player) {
+    @Override
+    public float calculateArmorWeightFactor(PlayerEntity player) {
         float totalWeight = 0f;
         for (ItemStack armorPiece : player.getArmorItems()) {
             if (armorPiece.getItem() instanceof ArmorItem) {
@@ -178,7 +204,8 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
         return 1f - totalWeight;
     }
 
-    private float calculateJumpBoost(PlayerEntity player, float weightFactor) {
+    @Override
+    public float calculateJumpBoost(PlayerEntity player, float weightFactor) {
         float baseMovementSpeed = (float) player.getAttributeValue(EntityAttributes.GENERIC_MOVEMENT_SPEED);
         float minJumpBoost = 0.42f;  // Default Minecraft jump boost
         float baseJumpBoost = 0.42f;
