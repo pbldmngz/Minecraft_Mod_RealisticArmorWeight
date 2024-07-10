@@ -3,9 +3,11 @@ package net.pbldmngz.realistic_armor_weight.mixin;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.math.MathHelper;
 import net.pbldmngz.realistic_armor_weight.ArmorWeightMod;
 import net.pbldmngz.realistic_armor_weight.CustomSpeedAccessor;
 import net.pbldmngz.realistic_armor_weight.network.ArmorWeightPackets;
@@ -98,7 +100,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
         }
     }
 
-    @Inject(method = "attack", at = @At("HEAD"))
+    @Inject(method = "attack", at = @At("HEAD"), cancellable = true)
     private void onAttack(Entity target, CallbackInfo ci) {
         PlayerEntity player = (PlayerEntity)(Object)this;
         float weightFactor = calculateArmorWeightFactor(player);
@@ -107,10 +109,18 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
         float damageMultiplier = calculateAttackMultiplier(currentSpeed, weightFactor);
         LOGGER.info("Attack damage multiplier: " + damageMultiplier);
 
-        modifyAttribute(player, EntityAttributes.GENERIC_ATTACK_DAMAGE, ATTACK_SPEED_UUID, "Speed Attack Modifier", damageMultiplier);
+        if (target instanceof LivingEntity) {
+            LivingEntity livingTarget = (LivingEntity) target;
+            float baseDamage = (float) player.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
+            float modifiedDamage = baseDamage * damageMultiplier;
 
-        double finalDamage = player.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
-        LOGGER.info("Final attack damage: " + finalDamage);
+            // Use DamageSource.player() instead of getDamageSources().playerAttack()
+            livingTarget.damage(DamageSource.player(player), modifiedDamage);
+            LOGGER.info("Base damage: " + baseDamage + ", Modified damage: " + modifiedDamage);
+
+            // Cancel the original attack
+            ci.cancel();
+        }
     }
 
 
@@ -142,14 +152,29 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
 
     private float calculateJumpBoost(PlayerEntity player, float weightFactor) {
         float baseMovementSpeed = (float) player.getAttributeValue(EntityAttributes.GENERIC_MOVEMENT_SPEED);
-        float jumpBoost = baseMovementSpeed * weightFactor * 10; // Adjust this multiplier as needed
+        float minJumpBoost = 1.2f; // Minimum jump boost
+        float maxJumpBoost = 20f; // Maximum jump boost
+        float scaleFactor = 10f; // Adjust this to control how quickly the boost reaches its maximum
+
+        // Calculate the raw jump boost
+        float rawJumpBoost = baseMovementSpeed * weightFactor * scaleFactor;
+
+        // Apply a logarithmic scale to make it harder to increase at higher values
+        float scaledJumpBoost = (float) (Math.log1p(rawJumpBoost) / Math.log1p(scaleFactor));
+
+        // Clamp the value between minJumpBoost and maxJumpBoost
+        float finalJumpBoost = MathHelper.clamp(
+                minJumpBoost + (maxJumpBoost - minJumpBoost) * scaledJumpBoost,
+                minJumpBoost,
+                maxJumpBoost
+        );
 
         // Increase jump height by 30% if the player is sprinting
         if (player.isSprinting()) {
-            jumpBoost *= 1.3f;
+            finalJumpBoost *= 1.3f;
         }
 
-        return jumpBoost;
+        return finalJumpBoost;
     }
 
     private void updateCurrentSpeed(PlayerEntity player) {
@@ -176,9 +201,9 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
 
     private float calculateAttackMultiplier(float currentSpeed, float weightFactor) {
         float speedFactor = currentSpeed / 5.612f; // Normalize speed (adjust divisor as needed)
-        speedFactor = Math.min(1, speedFactor); // Cap at 1
+        //speedFactor = Math.min(1, speedFactor); // Cap at 1
 
-        float damageMultiplier = 1 + (speedFactor * weightFactor * ArmorWeightMod.CONFIG.getSpeedAttackMultiplier());
+        float damageMultiplier = 1 + (speedFactor * ( 1 / weightFactor ) * ArmorWeightMod.CONFIG.getSpeedAttackMultiplier()) * 100;
         return damageMultiplier;
     }
 
