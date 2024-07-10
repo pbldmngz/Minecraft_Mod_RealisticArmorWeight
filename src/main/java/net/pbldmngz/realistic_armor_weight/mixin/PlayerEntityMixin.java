@@ -34,8 +34,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.awt.*;
 import java.util.UUID;
+import java.util.Queue;
+import java.util.LinkedList;
+
 
 @Mixin(PlayerEntity.class)
 public abstract class PlayerEntityMixin extends LivingEntity implements JumpHandler {
@@ -44,6 +49,10 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
     private static final UUID ELYTRA_SPEED_UUID = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final UUID ELYTRA_FALL_RESISTANCE_UUID = UUID.fromString("00000000-0000-0000-0000-000000000004");
     private static final UUID ATTACK_SPEED_UUID = UUID.fromString("3b07f6a1-ec4e-4f8b-9ed6-bda2e4e4bb6a");
+
+    private static final int SPEED_HISTORY_SIZE = 8; // Store last 5 speed readings
+    private Queue<Float> speedHistory = new LinkedList<>();
+    private float totalSpeed = 0f;
 
     private static final Logger LOGGER = LogManager.getLogger(ArmorWeightMod.class);
     private long lastJumpTime = 0;
@@ -100,29 +109,48 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
         }
     }
 
+    private boolean shouldNegateFallDamage(PlayerEntity player) {
+        long currentTime = System.currentTimeMillis();
+        float jumpDuration = calculateJumpDuration(player);
+        return currentTime - lastJumpTime < jumpDuration;
+    }
+
+    @Inject(method = "damage", at = @At("HEAD"), cancellable = true)
+    private void onDamage(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        if (source == DamageSource.FALL && shouldNegateFallDamage((PlayerEntity)(Object)this)) {
+            cir.setReturnValue(false);
+        }
+    }
+
+    private float calculateJumpDuration(PlayerEntity player) {
+        float jumpVelocity = (float) player.getVelocity().y;
+        // Estimate the time it takes to reach the peak of the jump
+        float timeToApex = jumpVelocity / 0.08f; // 0.08 is roughly the gravity constant in Minecraft
+        // Double it to account for both ascending and descending
+        return timeToApex * 2000; // Convert to milliseconds
+    }
+
     @Inject(method = "attack", at = @At("HEAD"), cancellable = true)
     private void onAttack(Entity target, CallbackInfo ci) {
         PlayerEntity player = (PlayerEntity)(Object)this;
-        float weightFactor = calculateArmorWeightFactor(player);
-        float currentSpeed = calculateCurrentSpeed(player);
-
-        float damageMultiplier = calculateAttackMultiplier(currentSpeed, weightFactor);
-        LOGGER.info("Attack damage multiplier: " + damageMultiplier);
 
         if (target instanceof LivingEntity) {
             LivingEntity livingTarget = (LivingEntity) target;
+
+            // Calculate damage multiplier here, to ensure it's updated for each attack
+            float weightFactor = calculateArmorWeightFactor(player);
+            float damageMultiplier = calculateAttackMultiplier(player, weightFactor);
+
             float baseDamage = (float) player.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
             float modifiedDamage = baseDamage * damageMultiplier;
 
-            // Use DamageSource.player() instead of getDamageSources().playerAttack()
-            livingTarget.damage(DamageSource.player(player), modifiedDamage);
-            LOGGER.info("Base damage: " + baseDamage + ", Modified damage: " + modifiedDamage);
+            // Apply the damage
+            boolean damaged = livingTarget.damage(DamageSource.player(player), modifiedDamage);
 
             // Cancel the original attack
             ci.cancel();
         }
     }
-
 
 
     private void updateArmorWeightEffects(PlayerEntity player) {
@@ -152,29 +180,53 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
 
     private float calculateJumpBoost(PlayerEntity player, float weightFactor) {
         float baseMovementSpeed = (float) player.getAttributeValue(EntityAttributes.GENERIC_MOVEMENT_SPEED);
-        float minJumpBoost = 1.2f; // Minimum jump boost
-        float maxJumpBoost = 20f; // Maximum jump boost
-        float scaleFactor = 10f; // Adjust this to control how quickly the boost reaches its maximum
+        float minJumpBoost = 0.42f;  // Default Minecraft jump boost
+        float baseJumpBoost = 0.42f;
+        float baseSpeed = 0.1f;
 
-        // Calculate the raw jump boost
-        float rawJumpBoost = baseMovementSpeed * weightFactor * scaleFactor;
+        float speedMultiplier = baseMovementSpeed / baseSpeed + baseSpeed;
 
-        // Apply a logarithmic scale to make it harder to increase at higher values
-        float scaledJumpBoost = (float) (Math.log1p(rawJumpBoost) / Math.log1p(scaleFactor));
+        // Ensure no reduction at low speeds, more dramatic increase for higher speeds
+        float jumpBoostIncrease = (float) (Math.max(0, Math.pow(speedMultiplier - 1, 2)) * 0.1f) - baseJumpBoost * 0.5f;
 
-        // Clamp the value between minJumpBoost and maxJumpBoost
-        float finalJumpBoost = MathHelper.clamp(
-                minJumpBoost + (maxJumpBoost - minJumpBoost) * scaledJumpBoost,
-                minJumpBoost,
-                maxJumpBoost
-        );
+        float adjustedJumpBoost = baseJumpBoost + jumpBoostIncrease;
+        float weightReducedJumpBoost = adjustedJumpBoost * (0.8f + weightFactor * 0.2f) * 4f;
 
-        // Increase jump height by 30% if the player is sprinting
         if (player.isSprinting()) {
-            finalJumpBoost *= 1.3f;
+            weightReducedJumpBoost *= (float) (Math.pow(0.8f, weightReducedJumpBoost) + 0.15f);
         }
 
-        return finalJumpBoost;
+        weightReducedJumpBoost = (float) Math.pow(weightReducedJumpBoost, 0.9f) - 0.75f * baseJumpBoost;
+
+        return Math.max(weightReducedJumpBoost, minJumpBoost);
+    }
+
+    private float calculateAttackMultiplier(PlayerEntity player, float weightFactor) {
+        float averageSpeed = calculateAverageSpeed();
+        float baseSpeed = 0.1f;
+
+        // Calculate horizontal speed
+        float horizontalSpeed = averageSpeed * 100000;
+
+        // Calculate total speed with reduced impact of vertical speed
+        float totalSpeed = horizontalSpeed - 0.0784f;
+
+        // Calculate speed factor
+        float speedFactor = totalSpeed / baseSpeed + baseSpeed;
+
+        // Calculate speed-based damage multiplier with more controlled scaling
+        float speedDamageMultiplier = 1f;
+        if (speedFactor > 1) {
+            speedDamageMultiplier = 1f + (float) (Math.pow(speedFactor, 0.6) / 25000) * ArmorWeightMod.CONFIG.getSpeedAttackMultiplier();
+        }
+
+        // Weight-based damage multiplier (more weight = more damage)
+        float weightDamageMultiplier = 1f + (1f - weightFactor) * 0.2f;
+
+        // Combine speed and weight multipliers
+        float combinedMultiplier = speedDamageMultiplier * weightDamageMultiplier;
+
+        return Math.max(combinedMultiplier, 1f);
     }
 
     private void updateCurrentSpeed(PlayerEntity player) {
@@ -184,27 +236,35 @@ public abstract class PlayerEntityMixin extends LivingEntity implements JumpHand
         if (lastMovementTime != 0) {
             double timeDelta = (currentTime - lastMovementTime) / 1000.0; // Convert to seconds
             Vec3d movement = currentPosition.subtract(lastPosition);
-            double speed = movement.length() / timeDelta;
+            float speed = (float) (movement.length() / timeDelta);
+
+            // Update speed history
+            if (speedHistory.size() >= SPEED_HISTORY_SIZE) {
+                totalSpeed -= speedHistory.poll();
+            }
+            speedHistory.offer(speed);
+            totalSpeed += speed;
+
+            float averageSpeed = calculateAverageSpeed();
 
             TrackedData<Float> customSpeedKey = ((CustomSpeedAccessor) player).armorweight$getCustomSpeedKey();
-            player.getDataTracker().set(customSpeedKey, (float) speed);
+            player.getDataTracker().set(customSpeedKey, averageSpeed);
         }
 
         lastPosition = currentPosition;
         lastMovementTime = currentTime;
     }
 
+    private float calculateAverageSpeed() {
+        if (speedHistory.isEmpty()) {
+            return 0f;
+        }
+        return totalSpeed / speedHistory.size();
+    }
+
     private float calculateCurrentSpeed(PlayerEntity player) {
         TrackedData<Float> customSpeedKey = ((CustomSpeedAccessor) player).armorweight$getCustomSpeedKey();
         return player.getDataTracker().get(customSpeedKey);
-    }
-
-    private float calculateAttackMultiplier(float currentSpeed, float weightFactor) {
-        float speedFactor = currentSpeed / 5.612f; // Normalize speed (adjust divisor as needed)
-        //speedFactor = Math.min(1, speedFactor); // Cap at 1
-
-        float damageMultiplier = 1 + (speedFactor * ( 1 / weightFactor ) * ArmorWeightMod.CONFIG.getSpeedAttackMultiplier()) * 100;
-        return damageMultiplier;
     }
 
     private void modifyAttribute(PlayerEntity player, EntityAttribute attribute, UUID id, String name, float modifier) {

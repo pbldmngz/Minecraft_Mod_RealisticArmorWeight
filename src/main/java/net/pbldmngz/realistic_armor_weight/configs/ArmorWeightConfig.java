@@ -62,7 +62,7 @@ public class ArmorWeightConfig {
         enableSpeedJump = true;
         elytraSpeedBonus = 0.3f;
         elytraFallResistanceBonus = 2.5f;
-        speedAttackMultiplier = 0.2f;
+        speedAttackMultiplier = 1f;
 
         saveConfig();
     }
