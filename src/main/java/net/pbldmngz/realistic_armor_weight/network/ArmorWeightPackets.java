@@ -3,6 +3,10 @@ package net.pbldmngz.realistic_armor_weight.network;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.minecraft.entity.attribute.EntityAttributeInstance;
+import net.minecraft.entity.attribute.EntityAttributeModifier;
+import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.data.TrackedData;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
@@ -10,7 +14,10 @@ import net.minecraft.util.math.Vec3d;
 import net.pbldmngz.realistic_armor_weight.ArmorWeightCalculator;
 import net.pbldmngz.realistic_armor_weight.ArmorWeightHandler;
 import net.pbldmngz.realistic_armor_weight.ArmorWeightMod;
+import net.pbldmngz.realistic_armor_weight.CustomSpeedAccessor;
 import net.pbldmngz.realistic_armor_weight.mixin.PlayerEntityMixin;
+
+import java.util.UUID;
 
 public class ArmorWeightPackets {
     public static final Identifier SYNC_ARMOR_WEIGHT = new Identifier(ArmorWeightMod.MOD_ID, "sync_armor_weight");
@@ -23,7 +30,26 @@ public class ArmorWeightPackets {
             client.execute(() -> {
                 if (client.player != null) {
                     // Apply the weightFactor to client-side movement prediction
-                    // This might involve updating the player's attributes or storing the value for use in movement calculations
+                    EntityAttributeInstance moveSpeedAttr = client.player.getAttributeInstance(EntityAttributes.GENERIC_MOVEMENT_SPEED);
+                    if (moveSpeedAttr != null) {
+                        // Remove existing modifiers
+                        moveSpeedAttr.removeModifier(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+
+                        // Add new modifier based on received weightFactor
+                        EntityAttributeModifier newModifier = new EntityAttributeModifier(
+                                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                                "Armor Weight Speed Modifier",
+                                weightFactor - 1,
+                                EntityAttributeModifier.Operation.MULTIPLY_TOTAL
+                        );
+                        moveSpeedAttr.addTemporaryModifier(newModifier);
+                    }
+
+                    // Update custom speed for client-side predictions
+                    if (client.player instanceof CustomSpeedAccessor) {
+                        TrackedData<Float> customSpeedKey = ((CustomSpeedAccessor) client.player).armorweight$getCustomSpeedKey();
+                        client.player.getDataTracker().set(customSpeedKey, weightFactor);
+                    }
                 }
             });
         });
