@@ -92,5 +92,34 @@ public class ArmorWeightPackets {
                 }
             });
         });
+
+        ServerPlayNetworking.registerGlobalReceiver(SYNC_ARMOR_WEIGHT, (server, player, handler, buf, responseSender) -> {
+            float weightFactor = buf.readFloat();
+            server.execute(() -> {
+                if (player instanceof ArmorWeightHandler) {
+                    ArmorWeightHandler armorWeightHandler = (ArmorWeightHandler) player;
+                    EntityAttributeInstance moveSpeedAttr = player.getAttributeInstance(EntityAttributes.GENERIC_MOVEMENT_SPEED);
+                    if (moveSpeedAttr != null) {
+                        // Remove existing modifiers
+                        moveSpeedAttr.removeModifier(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+
+                        // Add new modifier based on received weightFactor
+                        EntityAttributeModifier newModifier = new EntityAttributeModifier(
+                                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                                "Armor Weight Speed Modifier",
+                                weightFactor - 1,
+                                EntityAttributeModifier.Operation.MULTIPLY_TOTAL
+                        );
+                        moveSpeedAttr.addPersistentModifier(newModifier);
+                    }
+
+                    // Update custom speed for server-side calculations
+                    if (player instanceof CustomSpeedAccessor) {
+                        TrackedData<Float> customSpeedKey = ((CustomSpeedAccessor) player).armorweight$getCustomSpeedKey();
+                        player.getDataTracker().set(customSpeedKey, weightFactor);
+                    }
+                }
+            });
+        });
     }
 }
