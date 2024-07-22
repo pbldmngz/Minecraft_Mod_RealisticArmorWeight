@@ -9,7 +9,6 @@ import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.math.MathHelper;
 import net.pbldmngz.realistic_armor_weight.*;
 import net.pbldmngz.realistic_armor_weight.network.ArmorWeightPackets;
 
@@ -36,7 +35,6 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.awt.*;
 import java.util.UUID;
 import java.util.Queue;
 import java.util.LinkedList;
@@ -48,7 +46,6 @@ public abstract class PlayerEntityMixin extends LivingEntity implements ArmorWei
     private static final UUID ARMOR_WEIGHT_SPEED_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID ELYTRA_SPEED_UUID = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final UUID ELYTRA_FALL_RESISTANCE_UUID = UUID.fromString("00000000-0000-0000-0000-000000000004");
-    private static final UUID ATTACK_SPEED_UUID = UUID.fromString("3b07f6a1-ec4e-4f8b-9ed6-bda2e4e4bb6a");
 
     private static final int SPEED_HISTORY_SIZE = 8; // Store last 5 speed readings
     private Queue<Float> speedHistory = new LinkedList<>();

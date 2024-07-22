@@ -11,11 +11,9 @@ import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Vec3d;
-import net.pbldmngz.realistic_armor_weight.ArmorWeightCalculator;
 import net.pbldmngz.realistic_armor_weight.ArmorWeightHandler;
 import net.pbldmngz.realistic_armor_weight.ArmorWeightMod;
 import net.pbldmngz.realistic_armor_weight.CustomSpeedAccessor;
-import net.pbldmngz.realistic_armor_weight.mixin.PlayerEntityMixin;
 
 import java.util.UUID;
 
