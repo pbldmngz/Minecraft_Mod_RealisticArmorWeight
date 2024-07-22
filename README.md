@@ -16,4 +16,4 @@ Known behavior:
 - When installed on client side only, you only get the jump boost
 - When installed on both client and server side it fully works BUT there is a slight delay when player wants to run (like 0.3 seconds, probably because of latency)
 
-> If you have any idea of how to fix the input lag bug, I'll be thankful for your help
+> If you have any idea of how to fix the input lag bug, I'll be thankful for a comment on the Issues section
