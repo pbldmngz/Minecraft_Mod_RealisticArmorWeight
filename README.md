@@ -1,5 +1,7 @@
 # Realistic Agility Mod | Realistic Armor Weight
 
+> This mod was made to work alongside other mods that enables the player to increase it's moving speed. Like LevelZ for instance.
+
 Mod functionality:
 
 1. Weight will boost your damage output
